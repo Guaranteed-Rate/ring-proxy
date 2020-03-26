@@ -1,11 +1,10 @@
 (ns tailrecursion.ring-proxy
-  (:import
-    [java.net URI] )
   (:require
-    [clj-http.client         :refer [request]]
-    [clojure.string          :refer [join split]]
-    [ring.adapter.jetty      :refer [run-jetty]]
-    [ring.middleware.cookies :refer [wrap-cookies]] ))
+    [clj-http.client :refer [request]]
+    [clojure.string :refer [join split ends-with? starts-with? blank?]]
+    [ring.adapter.jetty :refer [run-jetty]]
+    [ring.middleware.cookies :refer [wrap-cookies]]
+    [clojure.string :as string]))
 
 (defn prepare-cookies
   "Removes the :domain and :secure keys and converts the :expires key (a Date)
@@ -24,30 +23,41 @@
       (.read rdr buf)
       buf)))
 
+(defn join-paths
+  "Safely combines a uri and a remote path."
+  [local-path base-remote accessed-path]
+  (let [remainder (subs accessed-path (.length local-path))]
+    (if (string/blank? remainder)
+      base-remote
+      (case [(ends-with? base-remote "/") (starts-with? remainder "/")]
+        [false false]
+        (str base-remote "/" remainder)
+        ([false true] [true false])
+        (str base-remote remainder)
+        [true true]
+        (str (subs base-remote 0 (dec (.length base-remote))) remainder)))))
+
 (defn wrap-proxy
   "Proxies requests from proxied-path, a local URI, to the remote URI at
   remote-base-uri, also a string."
   [handler ^String proxied-path remote-base-uri & [http-opts]]
   (wrap-cookies
-   (fn [req]
-     (if (.startsWith ^String (:uri req) proxied-path)
-       (let [rmt-full   (URI. (str remote-base-uri "/"))
-             rmt-path   (URI. (.getScheme    rmt-full)
-                              (.getAuthority rmt-full)
-                              (.getPath      rmt-full) nil nil)
-             lcl-path   (URI. (subs (:uri req) (.length proxied-path)))
-             remote-uri (.resolve rmt-path lcl-path) ]
-         (-> (merge {:method (:request-method req)
-                     :url (str remote-uri "?" (:query-string req))
-                     :headers (dissoc (:headers req) "host" "content-length")
-                     :body (if-let [len (get-in req [:headers "content-length"])]
-                             (slurp-binary (:body req) (Integer/parseInt len)))
-                     :follow-redirects true
-                     :throw-exceptions false
-                     :as :stream} http-opts)
-             request
-             prepare-cookies))
-       (handler req)))))
+    (fn [req]
+      (if (.startsWith ^String (:uri req) proxied-path)
+        (let [remote-uri (join-paths proxied-path remote-base-uri (:uri req))]
+          (-> (merge {:method           (:request-method req)
+                      :url              (if (blank? (:query-string req))
+                                          remote-uri
+                                          (str remote-uri (:query-string req)))
+                      :headers          (dissoc (:headers req) "host" "content-length")
+                      :body             (if-let [len (get-in req [:headers "content-length"])]
+                                          (slurp-binary (:body req) (Integer/parseInt len)))
+                      :follow-redirects true
+                      :throw-exceptions false
+                      :as               :stream} http-opts)
+              request
+              prepare-cookies))
+        (handler req)))))
 
 (defn run-proxy
   [listen-path listen-port remote-uri http-opts]
