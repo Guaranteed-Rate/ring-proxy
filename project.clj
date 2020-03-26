@@ -1,4 +1,4 @@
-(defproject com.guaranteedrate/ring-proxy "3.0.1-SNAPSHOT"
+(defproject com.guaranteedrate/ring-proxy "3.0.1"
   :description "HTTP proxy ring middleware for Clojure web applications."
   :url "https://github.com/Guaranteed-Rate/ring-proxy"
   :license {:name "Eclipse Public License"
