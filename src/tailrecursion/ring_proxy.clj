@@ -3,8 +3,7 @@
     [clj-http.client :refer [request]]
     [clojure.string :refer [join split ends-with? starts-with? blank?]]
     [ring.adapter.jetty :refer [run-jetty]]
-    [ring.middleware.cookies :refer [wrap-cookies]]
-    [clojure.string :as string]))
+    [ring.middleware.cookies :refer [wrap-cookies]]))
 
 (defn prepare-cookies
   "Removes the :domain and :secure keys and converts the :expires key (a Date)
@@ -27,7 +26,7 @@
   "Safely combines a uri and a remote path."
   [local-path base-remote accessed-path]
   (let [remainder (subs accessed-path (.length local-path))]
-    (if (string/blank? remainder)
+    (if (blank? remainder)
       base-remote
       (case [(ends-with? base-remote "/") (starts-with? remainder "/")]
         [false false]
