@@ -48,7 +48,7 @@
           (-> (merge {:method           (:request-method req)
                       :url              (if (blank? (:query-string req))
                                           remote-uri
-                                          (str remote-uri (:query-string req)))
+                                          (str remote-uri "?" (:query-string req)))
                       :headers          (dissoc (:headers req) "host" "content-length")
                       :body             (if-let [len (get-in req [:headers "content-length"])]
                                           (slurp-binary (:body req) (Integer/parseInt len)))
